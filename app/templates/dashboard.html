@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="/vendor/tabler/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 800px; height: 480px; overflow: hidden; background: #fff; color: #000; }
+body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing: none; }
+.sc { width: 800px; height: 480px; display: grid; grid-template-columns: 236px 1fr; grid-template-rows: 1fr 112px 28px; }
+.lb { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+.d1 { background-image: radial-gradient(#000 .9px, transparent 1.1px); background-size: 4px 4px; }
+.d2 { background-image: radial-gradient(#000 1.2px, transparent 1.4px); background-size: 3px 3px; }
+.k { background: #000; color: #fff; }
+.w { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+.w td { border: 1.5px solid #000; text-align: center; height: 38px; padding: 0; font-size: 16px; font-weight: 600; line-height: 1.1; }
+.w th { font-size: 13px; font-weight: 600; padding-bottom: 2px; }
+.pill { background: #fff; padding: 0 3px; border-radius: 3px; }
+.sw { display: inline-block; width: 11px; height: 11px; border: 1px solid #000; vertical-align: -1px; margin-right: 2px; }
+.arr { display: inline-block; font-size: 12px; }
+.ol { display: grid; grid-template-columns: 50px 1fr; font-size: 14px; line-height: 1.3; border-top: 1px solid #000; padding: 4px 0; }
+.tile { padding: 9px 14px; border-right: 1.5px solid #000; }
+.tile .v { font-size: 32px; font-weight: 600; }
+.tile .s { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="sc">
+  <div style="border-right:2px solid #000;padding:14px 16px;display:flex;flex-direction:column">
+    <div class="lb">{{ location }} · {{ date_label }}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+      <i class="ti ti-{{ weather.icon }}" style="font-size:48px"></i>
+      <span style="font-size:66px;font-weight:600;line-height:1">{{ weather.temp }}°</span>
+    </div>
+    <div style="font-size:17px;margin-top:4px">{{ weather.label }}</div>
+    <div style="font-size:17px">
+      {%- if weather.high is not none %}H {{ weather.high }}°{% endif %}
+      {%- if weather.high is not none and weather.low is not none %} · {% endif %}
+      {%- if weather.low is not none %}L {{ weather.low }}°{% endif %}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);margin-top:10px;font-size:13px;text-align:center;border-top:1.5px solid #000;padding-top:6px">
+      {% for h, t in weather.hourly %}<div>{{ h }}<br><b style="font-size:16px">{{ t }}</b></div>{% endfor %}
+    </div>
+    <div style="font-size:13px;margin-top:8px">{{ weather.note }}</div>
+    {% if holiday %}
+    <div style="margin-top:auto;border:2px solid #000;border-radius:6px;padding:6px 9px;font-size:14px;line-height:1.35">
+      <b>{{ holiday.title }}</b><br>
+      {% for line in holiday.lines %}{{ line }}<br>{% endfor %}
+      <span style="font-size:12px">{{ holiday.date }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div style="padding:10px 14px 6px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <span class="lb">Bay wind · kts{% if wind and wind.placeholder %} · SAMPLE{% endif %}</span>
+      <span style="font-size:12px"><span class="sw"></span>&lt;14 &nbsp;<span class="sw d1"></span>14–17 &nbsp;<span class="sw d2"></span>18–21 &nbsp;<span class="sw k"></span>22+</span>
+    </div>
+    {% if wind %}
+    <table class="w">
+      <thead><tr><th style="width:100px"></th><th style="width:70px">Now</th><th style="width:8px"></th>
+        {% for h in wind_hours %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for s in wind.spots %}
+        <tr>
+          <td style="text-align:left;padding-left:6px;font-size:15px;white-space:nowrap">{{ s.name }}</td>
+          <td style="border-width:3px">
+            {% if s.now %}<span style="font-size:20px">{{ s.now.avg }}</span><span style="font-size:13px"> g{{ s.now.gust }}</span><br>
+            <span style="font-size:12px"><i class="ti ti-arrow-up arr" style="transform:rotate({{ arrow_deg(s.now.dir) }}deg)"></i>{{ s.now.dir }}</span>{% else %}—{% endif %}
+          </td>
+          <td style="border:none"></td>
+          {% for lo, hi, d in s.forecast %}
+            {% set cl = shade(hi) %}{% set p = 'pill' if cl in ('d1', 'd2') else '' %}
+            <td class="{{ cl }}"><span class="{{ p }}">{{ lo }}–{{ hi }}</span><br>
+              <span class="{{ p }}" style="font-size:11px"><i class="ti ti-arrow-up arr" style="transform:rotate({{ arrow_deg(d) }}deg)"></i>{{ d }}</span></td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px">
+      <span class="lb">Outlook</span><span style="font-size:12px">iWindsurf pro, summarized</span>
+    </div>
+    {% for o in wind.outlook %}<div class="ol" {% if loop.first %}style="margin-top:2px"{% endif %}><b>{{ o.day }}</b><span>{{ o.text }}</span></div>{% endfor %}
+    {% else %}
+    <div style="margin-top:40px;font-size:16px">Wind data unavailable</div>
+    {% endif %}
+  </div>
+
+  <div style="grid-column:1/3;border-top:2px solid #000;display:grid;grid-template-columns:repeat({{ house|length }},1fr) 1.5fr">
+    {% for t in house %}
+    <div class="tile"><div class="lb">{{ t.label }}</div><div class="v">{{ t.value }}</div><div class="s">{{ t.sub }}</div></div>
+    {% endfor %}
+    {% if attention %}
+    <div class="k" style="padding:9px 14px"><div class="lb">Needs attention · {{ attention|length }}</div>
+      <div style="font-size:15px;line-height:1.45;margin-top:4px">{% for a in attention[:3] %}&#9656; {{ a }}<br>{% endfor %}</div></div>
+    {% else %}
+    <div style="padding:9px 14px;display:flex;align-items:center;gap:8px"><i class="ti ti-circle-check" style="font-size:28px"></i><span style="font-size:16px">All good at home</span></div>
+    {% endif %}
+  </div>
+
+  <div class="k" style="grid-column:1/3;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:13px">
+    <span><b>{{ footer_name }}</b></span><span>Updated {{ updated }}</span>
+  </div>
+</div>
+</body>
+</html>

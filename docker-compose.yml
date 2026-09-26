@@ -1,0 +1,11 @@
+services:
+  eink:
+    build: .
+    container_name: eink
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ./config.yaml:/srv/config.yaml:ro

@@ -1,0 +1,51 @@
+# Non-secret dashboard configuration. Secrets live in .env.
+
+timezone: America/Los_Angeles
+location_label: Berkeley
+footer_name: Bedroom board
+
+# How often the server re-renders the screen (seconds). The device only
+# downloads when the image actually changed.
+render_every: 300
+
+# Device wake schedule, local time. First matching window wins; "sleep"
+# windows tell the device to sleep until the window ends.
+refresh:
+  - {from: "22:30", to: "06:30", sleep: true}
+  - {from: "11:00", to: "19:00", seconds: 900}
+  - {from: "00:00", to: "24:00", seconds: 1800}
+
+weather_entity: weather.nws_home
+
+# Bottom strip tiles. `temp`/`humidity` are entity ids; `note` is optional
+# extra text; `extra` pulls another entity's state into the note.
+house:
+  - label: Bedroom
+    temp: sensor.0xb0e8e8fffe9a36c2_temperature
+    humidity: sensor.0xb0e8e8fffe9a36c2_humidity
+    extra: {entity: input_select.bedroom_fan_speed, prefix: "Fan: "}
+  - label: Office
+    temp: sensor.0x70d07efffedee566_temperature
+    humidity: sensor.0x70d07efffedee566_humidity
+  - label: Freezer
+    temp: sensor.0xa4c13810cc76ffff_temperature
+    ok_below: 10
+
+# Template sensor (to be created in HA) whose `items` attribute lists
+# things needing attention.
+attention_entity: sensor.eink_attention
+
+jewish_calendar:
+  holiday: sensor.jewish_calendar_holiday
+  date: sensor.jewish_calendar_date
+  candle_lighting: sensor.jewish_calendar_upcoming_candle_lighting
+  havdalah: sensor.jewish_calendar_upcoming_havdalah
+  issur_melacha: binary_sensor.jewish_calendar_issur_melacha_in_effect
+
+wind:
+  hours: [13, 14, 15, 16, 17, 18]
+  spots:
+    - Berkeley
+    - Albany
+    - Treasure Is.
+    - Candlestick
