@@ -4,6 +4,10 @@ timezone: America/Los_Angeles
 location_label: Berkeley
 footer_name: Bedroom board
 
+# 2 = 4-level grayscale PNG (TRMNL firmware 1.6.0+, marked experimental by
+# TRMNL). 1 = black/white BMP; switch to this if 2-bit misbehaves on the device.
+bit_depth: 2
+
 # How often the server re-renders the screen (seconds). The device only
 # downloads when the image actually changed.
 render_every: 300
@@ -47,5 +51,5 @@ wind:
   spots:
     - Berkeley
     - Albany
-    - Treasure Is.
+    - TI
     - Candlestick

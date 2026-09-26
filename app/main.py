@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import byos, data, render
@@ -54,9 +54,9 @@ async def update(app: FastAPI):
     ha_src, wind_src = SOURCES
     stale = [s.name for s in SOURCES if s.stale]
     app.state.screen.view = data.build(ha_src.value, wind_src.value, stale, datetime.now(TZ))
-    png = await app.state.renderer.screenshot()
-    bw, digest = render.to_one_bit(png)
-    render.save(bw)
+    png = await app.state.renderers[render.BITS].screenshot()
+    files, digest = render.convert(png)
+    render.save(files)
     if digest != app.state.screen.digest:
         log.info("new screen %s", digest)
     app.state.screen.digest = digest
@@ -75,12 +75,15 @@ async def loop(app: FastAPI):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.screen = Screen()
-    app.state.renderer = render.Renderer()
-    await app.state.renderer.start()
+    # Device renderer plus the other bit depth, for side-by-side previews.
+    app.state.renderers = {b: render.Renderer(b) for b in (1, 2)}
+    for r in app.state.renderers.values():
+        await r.start()
     task = asyncio.create_task(loop(app))
     yield
     task.cancel()
-    await app.state.renderer.stop()
+    for r in app.state.renderers.values():
+        await r.stop()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -95,8 +98,8 @@ async def root():
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard():
-    return render.render_html(app.state.screen.view)
+async def dashboard(bits: int = render.BITS):
+    return render.render_html(app.state.screen.view, bits)
 
 
 @app.get("/screen.bmp")
@@ -115,13 +118,26 @@ async def force_render():
     return {"digest": app.state.screen.digest}
 
 
+@app.get("/preview/{bits}.png")
+async def preview_png(bits: int):
+    """Render the current view at either bit depth, without touching the device image."""
+    if bits not in (1, 2):
+        return HTMLResponse("bits must be 1 or 2", status_code=404)
+    files, _ = render.convert(await app.state.renderers[bits].screenshot(), bits)
+    return Response(files["screen.png"], media_type="image/png")
+
+
 @app.get("/preview", response_class=HTMLResponse)
 async def preview():
     s = app.state.screen
-    return f"""<!doctype html><meta http-equiv="refresh" content="60">
+    shots = "".join(
+        f"""<figure style="margin:0 0 24px"><figcaption style="margin-bottom:6px">{b}-bit
+{'(sent to the display)' if b == render.BITS else '(preview only)'}</figcaption>
+<img src="/preview/{b}.png?v={s.digest}" width="800" height="480" style="image-rendering:pixelated;background:#fff"></figure>"""
+        for b in (render.BITS, 3 - render.BITS))
+    return f"""<!doctype html><meta http-equiv="refresh" content="120">
 <body style="background:#333;margin:0;padding:24px;font-family:sans-serif;color:#ddd">
-<p>1-bit render as sent to the display · {s.digest} ·
-<a style="color:#9cf" href="/dashboard">live HTML</a> ·
+<p>Screen {s.digest} · <a style="color:#9cf" href="/dashboard">live HTML</a> ·
 <form style="display:inline" method="post" action="/render"><button>Re-render</button></form></p>
-<img src="/screen.png?v={s.digest}" width="800" height="480" style="image-rendering:pixelated;background:#fff">
+{shots}
 </body>"""

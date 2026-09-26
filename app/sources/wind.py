@@ -21,7 +21,7 @@ async def fetch() -> dict:
                              (13, 17, "WNW"), (13, 17, "WNW"), (7, 11, "WNW")],
             },
             {
-                "name": "Treasure Is.",
+                "name": "TI",
                 "now": {"avg": 18, "gust": 23, "dir": "WSW"},
                 "forecast": [(19, 23, "WSW"), (16, 20, "WSW"), (16, 20, "WSW"),
                              (20, 24, "WSW"), (20, 24, "WSW"), (13, 17, "WSW")],

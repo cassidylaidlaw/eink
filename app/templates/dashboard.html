@@ -1,4 +1,8 @@
 <!doctype html>
+{% macro arrow(dir, size=12) -%}
+<svg class="arr" width="{{ size }}" height="{{ size }}" viewBox="-6 -6 12 12" style="transform:rotate({{ arrow_deg(dir) }}deg)"{% if bits == 1 %} shape-rendering="crispEdges"{% endif %}><path d="M0,-6 L5,-0.5 L1.6,-0.5 L1.6,6 L-1.6,6 L-1.6,-0.5 L-5,-0.5 Z"/></svg>
+{%- endmacro %}
+
 <html>
 <head>
 <meta charset="utf-8">
@@ -9,22 +13,26 @@ html, body { width: 800px; height: 480px; overflow: hidden; background: #fff; co
 body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing: none; }
 .sc { width: 800px; height: 480px; display: grid; grid-template-columns: 236px 1fr; grid-template-rows: 1fr 112px 28px; }
 .lb { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
-.d1 { background-image: radial-gradient(#000 .9px, transparent 1.1px); background-size: 4px 4px; }
-.d2 { background-image: radial-gradient(#000 1.2px, transparent 1.4px); background-size: 3px 3px; }
+/* Wind shading: flat greys in 2-bit mode, pixel-exact dither in 1-bit. */
+.b2 .d1 { background: #aaa; }
+.b2 .d2 { background: #555; color: #fff; }
+.b1 .d1 { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3C/svg%3E") 0 0 / 2px 2px; }
+.b1 .d2 { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3Crect x='1' y='1' width='1' height='1'/%3E%3C/svg%3E") 0 0 / 2px 2px; }
 .k { background: #000; color: #fff; }
+.b1 .pill { background: #fff; padding: 0 3px; }
+.arr { display: inline-block; vertical-align: -2px; margin-right: 1px; }
+.arr path { fill: currentColor; }
 .w { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
-.w td { border: 1.5px solid #000; text-align: center; height: 38px; padding: 0; font-size: 16px; font-weight: 600; line-height: 1.1; }
+.w td { border: 2px solid #000; text-align: center; height: 38px; padding: 0; font-size: 16px; font-weight: 600; line-height: 1.1; }
 .w th { font-size: 13px; font-weight: 600; padding-bottom: 2px; }
-.pill { background: #fff; padding: 0 3px; border-radius: 3px; }
 .sw { display: inline-block; width: 11px; height: 11px; border: 1px solid #000; vertical-align: -1px; margin-right: 2px; }
-.arr { display: inline-block; font-size: 12px; }
 .ol { display: grid; grid-template-columns: 50px 1fr; font-size: 14px; line-height: 1.3; border-top: 1px solid #000; padding: 4px 0; }
-.tile { padding: 9px 14px; border-right: 1.5px solid #000; }
+.tile { padding: 9px 14px; border-right: 2px solid #000; }
 .tile .v { font-size: 32px; font-weight: 600; }
 .tile .s { font-size: 13px; }
 </style>
 </head>
-<body>
+<body class="b{{ bits }}">
 <div class="sc">
   <div style="border-right:2px solid #000;padding:14px 16px;display:flex;flex-direction:column">
     <div class="lb">{{ location }} · {{ date_label }}</div>
@@ -38,7 +46,7 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
       {%- if weather.high is not none and weather.low is not none %} · {% endif %}
       {%- if weather.low is not none %}L {{ weather.low }}°{% endif %}
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);margin-top:10px;font-size:13px;text-align:center;border-top:1.5px solid #000;padding-top:6px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);margin-top:10px;font-size:13px;text-align:center;border-top:2px solid #000;padding-top:6px">
       {% for h, t in weather.hourly %}<div>{{ h }}<br><b style="font-size:16px">{{ t }}</b></div>{% endfor %}
     </div>
     <div style="font-size:13px;margin-top:8px">{{ weather.note }}</div>
@@ -66,13 +74,13 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
           <td style="text-align:left;padding-left:6px;font-size:15px;white-space:nowrap">{{ s.name }}</td>
           <td style="border-width:3px">
             {% if s.now %}<span style="font-size:20px">{{ s.now.avg }}</span><span style="font-size:13px"> g{{ s.now.gust }}</span><br>
-            <span style="font-size:12px"><i class="ti ti-arrow-up arr" style="transform:rotate({{ arrow_deg(s.now.dir) }}deg)"></i>{{ s.now.dir }}</span>{% else %}—{% endif %}
+            <span style="font-size:12px">{{ arrow(s.now.dir) }}{{ s.now.dir }}</span>{% else %}—{% endif %}
           </td>
           <td style="border:none"></td>
           {% for lo, hi, d in s.forecast %}
             {% set cl = shade(hi) %}{% set p = 'pill' if cl in ('d1', 'd2') else '' %}
             <td class="{{ cl }}"><span class="{{ p }}">{{ lo }}–{{ hi }}</span><br>
-              <span class="{{ p }}" style="font-size:11px"><i class="ti ti-arrow-up arr" style="transform:rotate({{ arrow_deg(d) }}deg)"></i>{{ d }}</span></td>
+              <span class="{{ p }}" style="font-size:11px">{{ arrow(d) }}{{ d }}</span></td>
           {% endfor %}
         </tr>
       {% endfor %}

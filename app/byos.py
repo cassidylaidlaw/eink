@@ -12,6 +12,7 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from .config import CFG, DATA_DIR, TZ, env
+from .render import DEVICE_IMAGE
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -56,7 +57,7 @@ def refresh_seconds(now: datetime) -> int:
 
 
 def _image_url(state) -> str:
-    return f"{env('PUBLIC_URL').rstrip('/')}/screen.bmp?v={state.digest}"
+    return f"{env('PUBLIC_URL').rstrip('/')}/{DEVICE_IMAGE}?v={state.digest}"
 
 
 @router.get("/setup")
