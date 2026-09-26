@@ -1,6 +1,8 @@
 <!doctype html>
 {% macro arrow(dir, size=12) -%}
-<svg class="arr" width="{{ size }}" height="{{ size }}" viewBox="-6 -6 12 12" style="transform:rotate({{ arrow_deg(dir) }}deg)"{% if bits == 1 %} shape-rendering="crispEdges"{% endif %}><path d="M0,-6 L5,-0.5 L1.6,-0.5 L1.6,6 L-1.6,6 L-1.6,-0.5 L-5,-0.5 Z"/></svg>
+{% set deg = arrow_deg(dir) %}{% if deg is not none -%}
+<svg class="arr" width="{{ size }}" height="{{ size }}" viewBox="-6 -6 12 12" style="transform:rotate({{ deg }}deg)"{% if bits == 1 %} shape-rendering="crispEdges"{% endif %}><path d="M0,-6 L5,-0.5 L1.6,-0.5 L1.6,6 L-1.6,6 L-1.6,-0.5 L-5,-0.5 Z"/></svg>
+{%- endif %}
 {%- endmacro %}
 
 <html>
@@ -74,20 +76,21 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
           <td style="text-align:left;padding-left:6px;font-size:15px;white-space:nowrap">{{ s.name }}</td>
           <td style="border-width:3px">
             {% if s.now %}<span style="font-size:20px">{{ s.now.avg }}</span><span style="font-size:13px"> g{{ s.now.gust }}</span><br>
-            <span style="font-size:12px">{{ arrow(s.now.dir) }}{{ s.now.dir }}</span>{% else %}—{% endif %}
+            <span style="font-size:12px">{{ arrow(s.now.dir) }}{{ s.now.dir }}</span>{% else %}<span style="font-size:13px">down</span>{% endif %}
           </td>
           <td style="border:none"></td>
-          {% for lo, hi, d in s.forecast %}
-            {% set cl = shade(hi) %}{% set p = 'pill' if cl in ('d1', 'd2') else '' %}
+          {% for cell in (s.forecast or [none] * wind_hours|length) %}
+            {% if cell %}{% set lo, hi, d = cell %}{% set cl = shade(hi) %}{% set p = 'pill' if cl in ('d1', 'd2') else '' %}
             <td class="{{ cl }}"><span class="{{ p }}">{{ lo }}–{{ hi }}</span><br>
               <span class="{{ p }}" style="font-size:11px">{{ arrow(d) }}{{ d }}</span></td>
+            {% else %}<td>–</td>{% endif %}
           {% endfor %}
         </tr>
       {% endfor %}
       </tbody>
     </table>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px">
-      <span class="lb">Outlook</span><span style="font-size:12px">iWindsurf pro, summarized</span>
+      <span class="lb">Outlook</span><span style="font-size:12px">iWindsurf pro{% if wind.issued %} · issued {{ wind.issued[11:16] }}{% endif %}</span>
     </div>
     {% for o in wind.outlook %}<div class="ol" {% if loop.first %}style="margin-top:2px"{% endif %}><b>{{ o.day }}</b><span>{{ o.text }}</span></div>{% endfor %}
     {% else %}

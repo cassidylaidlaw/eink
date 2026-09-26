@@ -14,6 +14,8 @@ from .sources import ha, wind
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("eink")
+# httpx logs full URLs at INFO, and the iWindsurf token rides in the query string.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # A source counts as stale once its last success is this old.
 STALE_AFTER = 3 * CFG["render_every"]

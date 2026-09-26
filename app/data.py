@@ -27,7 +27,9 @@ COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
 
 
-def arrow_deg(direction: str) -> float:
+def arrow_deg(direction: str) -> float | None:
+    if direction not in COMPASS:
+        return None
     return (COMPASS.index(direction) * 22.5 + 180) % 360
 
 

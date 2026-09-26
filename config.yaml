@@ -47,9 +47,12 @@ jewish_calendar:
   issur_melacha: binary_sensor.jewish_calendar_issur_melacha_in_effect
 
 wind:
+  # iWindsurf "San Francisco" pro forecast.
+  forecast_id: 2
   hours: [13, 14, 15, 16, 17, 18]
+  # Spot ids are shared by the pro forecast and the live station feed.
   spots:
-    - Berkeley
-    - Albany
-    - TI
-    - Candlestick
+    - {name: Berkeley, id: 409}       # Berkeley Marina - Olympic Circle
+    - {name: Albany, id: 161947}      # Richmond Harbor - Albany Bulb (live: Point Isabel)
+    - {name: TI, id: 87071}           # Treasure Island
+    - {name: Candlestick, id: 412}    # Candlestick Point
