@@ -30,7 +30,7 @@ the wind is, where, and when, in the forecaster's own terms.
 - Keep strength wording like "mid to upper-teens" or ranges like "15-19". No "kts".
 - Skip the meteorology (pressure gradients, highs, lows) unless it's the only content;
   then give the gist, e.g. "Weaker; forecast uncertain".
-- Abbreviations: TI (Treasure Island), GG (Golden Gate), PM, AM.
+- Abbreviations: TI (Treasure Island), PI (Point Isabel), GG (Golden Gate), PM, AM.
 
 Example: "Mid-upper teens mid-GG to TI, Sherman PM"
 

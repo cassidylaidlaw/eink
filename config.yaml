@@ -53,6 +53,6 @@ wind:
   # Spot ids are shared by the pro forecast and the live station feed.
   spots:
     - {name: Berkeley, id: 409}       # Berkeley Marina - Olympic Circle
-    - {name: Albany, id: 161947}      # Richmond Harbor - Albany Bulb (live: Point Isabel)
+    - {name: Point Isabel, id: 161947}  # forecast: "Richmond Harbor - Albany Bulb"
     - {name: TI, id: 87071}           # Treasure Island
     - {name: Candlestick, id: 412}    # Candlestick Point
