@@ -6,6 +6,7 @@ Contract: https://github.com/usetrmnl/trmnl-firmware (README, API section).
 import json
 import logging
 import secrets
+import time
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Header, Request
@@ -56,8 +57,20 @@ def refresh_seconds(now: datetime) -> int:
     return 1800
 
 
-def _image_url(state) -> str:
-    return f"{env('PUBLIC_URL').rstrip('/')}/{DEVICE_IMAGE}?v={state.digest}"
+def _filename(state) -> str:
+    """Unique per check-in, even when the image hasn't changed.
+
+    Works around trmnl-firmware#477: when a wake sees the same filename as the
+    last one, the firmware takes its "old image, don't redraw" path and then
+    hangs entering deep sleep, so the RTC watchdog resets it every ~30-44 s
+    (seen on the reTerminal E1001 with FW1.8.10). Always sending a new name
+    costs a redraw per wake. Revert to plain `state.digest` once fixed upstream.
+    """
+    return f"{state.digest}-{int(time.time())}"
+
+
+def _image_url(state, filename: str) -> str:
+    return f"{env('PUBLIC_URL').rstrip('/')}/{DEVICE_IMAGE}?v={filename}"
 
 
 @router.get("/setup")
@@ -76,8 +89,9 @@ async def setup(request: Request, id: str = Header(default="", alias="ID")):
     save_devices(devices)
     log.info("device %s registered (%s)", mac, dev["friendly_id"])
     state = request.app.state.screen
+    filename = _filename(state)
     return {"status": 200, "api_key": dev["api_key"], "friendly_id": dev["friendly_id"],
-            "image_url": _image_url(state), "filename": state.digest}
+            "image_url": _image_url(state, filename), "filename": filename}
 
 
 @router.get("/display")
@@ -100,10 +114,11 @@ async def display(
     save_devices(devices)
 
     state = request.app.state.screen
+    filename = _filename(state)
     return {
         "status": 0,
-        "image_url": _image_url(state),
-        "filename": state.digest,
+        "image_url": _image_url(state, filename),
+        "filename": filename,
         "update_firmware": False,
         "firmware_url": None,
         "refresh_rate": str(refresh_seconds(now)),
