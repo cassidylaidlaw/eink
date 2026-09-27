@@ -8,6 +8,9 @@ footer_name: Bedroom board
 # experimental). The reTerminal E1001 on FW1.8.10 drew a blank screen for our
 # 2-bit PNG (cf. trmnl-firmware#606), so 1-bit for now.
 bit_depth: 1
+# png (default) or bmp. The E1001 on FW1.8.10 accepted our 1-bit BMP but never
+# drew it, so PNG.
+device_format: png
 
 # How often the server re-renders the screen (seconds). The device only
 # downloads when the image actually changed.

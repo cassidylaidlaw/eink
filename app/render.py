@@ -113,5 +113,6 @@ def save(files: dict[str, bytes]) -> None:
         tmp.replace(DATA_DIR / name)
 
 
-# Image the device downloads: BMP is the most widely supported 1-bit format.
-DEVICE_IMAGE = "screen.png" if BITS == 2 else "screen.bmp"
+# Image the device downloads. TRMNL's cloud serves PNG, so that is the
+# firmware's best-exercised decode path; set device_format: bmp to send BMP.
+DEVICE_IMAGE = "screen.bmp" if BITS == 1 and CFG.get("device_format") == "bmp" else "screen.png"
