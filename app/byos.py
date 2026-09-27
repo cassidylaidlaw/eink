@@ -3,12 +3,14 @@
 Contract: https://github.com/usetrmnl/trmnl-firmware (README, API section).
 """
 
+import asyncio
 import json
 import logging
 import secrets
 import time
 from datetime import datetime, timedelta
 
+import httpx
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
@@ -73,6 +75,28 @@ def _image_url(state, filename: str) -> str:
     return f"{env('PUBLIC_URL').rstrip('/')}/{DEVICE_IMAGE}?v={filename}"
 
 
+async def _report_checkin(battery_voltage: str) -> None:
+    """Tell HA the display checked in (automation "E-ink display - check-in"),
+    so its attention sync can flag a display that went quiet or runs low."""
+    hook = env("EINK_WEBHOOK_ID")
+    if not hook:
+        return
+    try:
+        volts = float(battery_voltage)
+    except ValueError:
+        volts = None
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(f"{env('HA_URL').rstrip('/')}/api/webhook/{hook}",
+                             json={"timestamp": int(time.time()), "battery_voltage": volts})
+            r.raise_for_status()
+    except Exception as e:
+        log.warning("check-in webhook to HA failed: %s", e)
+
+
+_background: set[asyncio.Task] = set()
+
+
 @router.get("/setup")
 async def setup(request: Request, id: str = Header(default="", alias="ID")):
     mac = id.upper()
@@ -112,6 +136,9 @@ async def display(
     dev.update(last_seen=now.isoformat(), battery_voltage=battery_voltage,
                fw_version=fw_version, rssi=rssi)
     save_devices(devices)
+    task = asyncio.create_task(_report_checkin(battery_voltage))
+    _background.add(task)
+    task.add_done_callback(_background.discard)
 
     state = request.app.state.screen
     filename = _filename(state)
