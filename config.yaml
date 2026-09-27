@@ -4,12 +4,11 @@ timezone: America/Los_Angeles
 location_label: Berkeley
 footer_name: Bedroom board
 
-# 1 = black/white BMP. 2 = 4-level grayscale PNG (TRMNL firmware 1.6.0+,
-# experimental). The reTerminal E1001 on FW1.8.10 drew a blank screen for our
-# 2-bit PNG (cf. trmnl-firmware#606), so 1-bit for now.
-bit_depth: 1
-# png (default) or bmp. The E1001 on FW1.8.10 accepted our 1-bit BMP but never
-# drew it, so PNG.
+# 1 = black/white, 2 = 4-level grayscale PNG (TRMNL firmware 1.6.0+,
+# experimental). Device: reTerminal E1001, which needs FW1.8.0 - FW1.8.10
+# downloads images but never draws them (cf. trmnl-firmware#298).
+bit_depth: 2
+# 1-bit only: png (default, TRMNL cloud's format) or bmp.
 device_format: png
 
 # How often the server re-renders the screen (seconds). The device only
