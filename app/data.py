@@ -1,5 +1,6 @@
 """Turn raw source data into the view model the template renders."""
 
+import re
 from datetime import datetime, timedelta
 
 from .config import CFG, TZ
@@ -141,7 +142,7 @@ def build_holiday(ha: dict, now: datetime) -> dict | None:
     return {"title": title or "Jewish calendar", "date": date, "lines": lines}
 
 
-def build_house(ha: dict, weather: dict) -> list[dict]:
+def build_house(ha: dict) -> list[dict]:
     st = ha["states"]
     tiles = []
     for t in CFG["house"]:
@@ -161,27 +162,26 @@ def build_house(ha: dict, weather: dict) -> list[dict]:
             "sub": " · ".join(subs),
         })
 
-    bedroom = _num(st, CFG["house"][0].get("temp"))
-    outside = weather["temp"] if isinstance(weather["temp"], (int, float)) else None
-    hint = ""
-    if outside is not None and bedroom is not None:
-        if bedroom > 72 and outside < bedroom - 3:
-            hint = "Open windows"
-        elif outside > bedroom:
-            hint = "Keep closed"
-    tiles.append({"label": "Outside", "value": f"{outside}°" if outside is not None else "—", "sub": hint})
     return tiles
 
 
+PRIORITY_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
+
+
 def build_attention(ha: dict, stale: list[str]) -> list[str]:
-    ent = ha["states"].get(CFG["attention_entity"], {})
-    items = list(ent.get("attributes", {}).get("items") or [])
-    items += [f"{name} data stale" for name in stale]
-    return items
+    """Open attention items, most urgent first. Priority comes from the
+    '[attention] priority=... key=...' marker line that script.attention_add writes."""
+    items = []
+    for it in ha.get("attention", []):
+        m = re.search(r"\[attention\] priority=(\w+)", it.get("description") or "")
+        prio = m.group(1) if m else "normal"
+        items.append((PRIORITY_ORDER.get(prio, 2), it.get("due") or "", it["summary"]))
+    items.sort()
+    return [s for _, _, s in items] + [f"{name} data stale" for name in stale]
 
 
 def build(ha: dict | None, wind: dict | None, stale: list[str], now: datetime) -> dict:
-    ha = ha or {"states": {}, "hourly": [], "twice_daily": []}
+    ha = ha or {"states": {}, "hourly": [], "twice_daily": [], "attention": []}
     weather = build_weather(ha, now)
     hours = CFG["wind"]["hours"]
     return {
@@ -189,7 +189,8 @@ def build(ha: dict | None, wind: dict | None, stale: list[str], now: datetime) -
         "date_label": f"{now:%a %b} {now.day}",
         "weather": weather,
         "holiday": build_holiday(ha, now),
-        "house": build_house(ha, weather),
+        "house": build_house(ha),
+        "house_slots": CFG.get("house_slots", 4),
         "attention": build_attention(ha, stale),
         "wind": wind,
         "wind_hours": [fmt_hour(h) if i in (0, len(hours) - 1) else str(h % 12 or 12)

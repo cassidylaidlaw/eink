@@ -13,8 +13,8 @@ def _client() -> httpx.AsyncClient:
     )
 
 
-async def fetch(weather_entity: str) -> dict:
-    """Return {"states": {entity_id: state_obj}, "hourly": [...], "twice_daily": [...]}."""
+async def fetch(weather_entity: str, attention_list: str) -> dict:
+    """Return {"states": {...}, "hourly": [...], "twice_daily": [...], "attention": [todo items]}."""
     async with _client() as c:
         r = await c.get("/api/states")
         r.raise_for_status()
@@ -29,4 +29,11 @@ async def fetch(weather_entity: str) -> dict:
             r.raise_for_status()
             forecasts[kind] = r.json()["service_response"][weather_entity]["forecast"]
 
-    return {"states": states, **forecasts}
+        r = await c.post(
+            "/api/services/todo/get_items?return_response",
+            json={"entity_id": attention_list, "status": "needs_action"},
+        )
+        r.raise_for_status()
+        attention = r.json()["service_response"][attention_list]["items"]
+
+    return {"states": states, **forecasts, "attention": attention}

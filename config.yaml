@@ -21,7 +21,9 @@ refresh:
 
 weather_entity: weather.nws_home
 
-# Bottom strip tiles. `temp`/`humidity` are entity ids; `note` is optional
+# Bottom strip tiles (up to `house_slots`; unused slots stay blank).
+house_slots: 4
+# `temp`/`humidity` are entity ids; `note` is optional
 # extra text; `extra` pulls another entity's state into the note.
 house:
   - label: Bedroom
@@ -31,13 +33,12 @@ house:
   - label: Office
     temp: sensor.0x70d07efffedee566_temperature
     humidity: sensor.0x70d07efffedee566_humidity
-  - label: Freezer
-    temp: sensor.0xa4c13810cc76ffff_temperature
-    ok_below: 10
 
-# Template sensor (to be created in HA) whose `items` attribute lists
-# things needing attention.
-attention_entity: sensor.eink_attention
+
+# HA to-do list that is the household attention hub (see HA scripts
+# attention_add / attention_resolve and automation attention_sync). Open items
+# are shown, highest priority first.
+attention_list: todo.household
 
 jewish_calendar:
   holiday: sensor.jewish_calendar_holiday

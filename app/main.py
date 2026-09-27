@@ -46,7 +46,7 @@ class Screen:
 
 
 SOURCES = [
-    Source("Home Assistant", lambda: ha.fetch(CFG["weather_entity"])),
+    Source("Home Assistant", lambda: ha.fetch(CFG["weather_entity"], CFG["attention_list"])),
     Source("Wind", wind.fetch),
 ]
 
