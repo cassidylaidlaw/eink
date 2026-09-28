@@ -104,6 +104,15 @@ def _spot_forecast(fc: dict, spot_id: int, hours: list[int]) -> list[tuple[int, 
     return None
 
 
+def _issued_label(stamp: str) -> str:
+    """'2026-09-27 19:00:00' -> '7:00p'."""
+    try:
+        t = datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ""
+    return f"{t.hour % 12 or 12}:{t.minute:02d}{'a' if t.hour < 12 else 'p'}"
+
+
 async def fetch() -> dict:
     global _forecast
     cfg = CFG["wind"]
@@ -117,18 +126,27 @@ async def fetch() -> dict:
                                                  forecast_id=cfg["forecast_id"]))
     fc = _forecast[1]
 
-    # The daily forecast is for its valid date only; don't show yesterday's.
+    # The daily forecast covers one date. The evening update (~7 pm) is for
+    # tomorrow, so show today's or a later one, labelled; hide only a stale one.
     valid = fc["daily"].get("valid_time_local", "")[:10]
     today = datetime.now(TZ).strftime("%Y-%m-%d")
+    current = valid >= today
+    if not current:
+        forecast_day = ""
+    elif valid == today:
+        forecast_day = "Today"
+    else:
+        forecast_day = datetime.strptime(valid, "%Y-%m-%d").strftime("%a")
     spots = [{
         "name": s["name"],
         "now": live.get(s["id"]),
-        "forecast": _spot_forecast(fc, s["id"], cfg["hours"]) if valid == today else None,
+        "forecast": _spot_forecast(fc, s["id"], cfg["hours"]) if current else None,
     } for s in cfg["spots"]]
 
     return {
         "spots": spots,
         "outlook": await outlook.summarize(fc.get("extended", {}).get("days", [])),
-        "issued": fc["daily"].get("issued_timestamp_local", ""),
+        "forecast_day": forecast_day,
+        "issued": _issued_label(fc["daily"].get("issued_timestamp_local", "")),
         "placeholder": False,
     }
