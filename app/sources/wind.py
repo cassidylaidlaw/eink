@@ -7,7 +7,7 @@ embeds a session token (`var token = '...'`) that the API accepts as
 
 import logging
 import time
-from datetime import datetime
+from datetime import date, datetime
 
 import httpx
 
@@ -104,13 +104,33 @@ def _spot_forecast(fc: dict, spot_id: int, hours: list[int]) -> list[tuple[int, 
     return None
 
 
-def _issued_label(stamp: str) -> str:
+def _issued_label(stamp: str | None) -> str:
     """'2026-09-27 19:00:00' -> '7:00p'."""
     try:
         t = datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
+    except (TypeError, ValueError):
         return ""
     return f"{t.hour % 12 or 12}:{t.minute:02d}{'a' if t.hour < 12 else 'p'}"
+
+
+def _date_of(stamp: str | None) -> date | None:
+    """Leading YYYY-MM-DD of an API timestamp. On days the forecaster doesn't
+    publish, the API sends the literal text 'null 00:00:00'."""
+    try:
+        return datetime.strptime((stamp or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _missing_reason(daily: dict, today: date) -> str:
+    """Why there is no current pro forecast, for the display."""
+    start, end = _date_of(daily.get("season_start")), _date_of(daily.get("season_end"))
+    if start and end and not (start <= today < end):
+        nxt = start if today < start else start.replace(year=start.year + 1)
+        return f"off-season until {nxt:%b} {nxt.day}"
+    if daily.get("season_status") == "forecast not published":
+        return "not published today"
+    return "no forecast"
 
 
 async def fetch() -> dict:
@@ -121,22 +141,26 @@ async def fetch() -> dict:
                                  headers={"User-Agent": "Mozilla/5.0 (eink dashboard)"}) as c:
         live = _live(await _api(c, "spot/getSpotDetailSetByList", spot_types="1,100,101",
                                 spot_list=",".join(map(str, ids))))
+        # A forecast failure must never cost the live readings; keep the last one.
         if not _forecast or time.time() - _forecast[0] > FORECAST_EVERY:
-            _forecast = (time.time(), await _api(c, "forecast/getOperationalForecast",
-                                                 forecast_id=cfg["forecast_id"]))
-    fc = _forecast[1]
+            try:
+                _forecast = (time.time(), await _api(c, "forecast/getOperationalForecast",
+                                                     forecast_id=cfg["forecast_id"]))
+            except Exception as e:
+                log.warning("pro forecast fetch failed, keeping previous: %s", e)
+    fc = _forecast[1] if _forecast else {}
+    daily = fc.get("daily") or {}
 
     # The daily forecast covers one date. The evening update (~7 pm) is for
-    # tomorrow, so show today's or a later one, labelled; hide only a stale one.
-    valid = fc["daily"].get("valid_time_local", "")[:10]
-    today = datetime.now(TZ).strftime("%Y-%m-%d")
-    current = valid >= today
+    # tomorrow, so show today's or a later one, labelled; hide a stale or
+    # unpublished one and say why.
+    today = datetime.now(TZ).date()
+    valid = _date_of(daily.get("valid_time_local"))
+    current = valid is not None and valid >= today
     if not current:
-        forecast_day = ""
-    elif valid == today:
-        forecast_day = "Today"
+        forecast_day, note = "", _missing_reason(daily, today)
     else:
-        forecast_day = datetime.strptime(valid, "%Y-%m-%d").strftime("%a")
+        forecast_day, note = ("Today" if valid == today else f"{valid:%a}"), ""
     spots = [{
         "name": s["name"],
         "now": live.get(s["id"]),
@@ -145,8 +169,9 @@ async def fetch() -> dict:
 
     return {
         "spots": spots,
-        "outlook": await outlook.summarize(fc.get("extended", {}).get("days", [])),
+        "outlook": await outlook.summarize((fc.get("extended") or {}).get("days") or []),
         "forecast_day": forecast_day,
-        "issued": _issued_label(fc["daily"].get("issued_timestamp_local", "")),
+        "note": note,
+        "issued": _issued_label(daily.get("issued_timestamp_local")) if current else "",
         "placeholder": False,
     }
