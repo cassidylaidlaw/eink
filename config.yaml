@@ -57,8 +57,10 @@ evening_switch: "18:00"
 wind:
   # iWindsurf "San Francisco" pro forecast.
   forecast_id: 2
-  # When the pro outlook is missing, the model outlook covers these spots.
-  model_outlook_spots: [Berkeley, TI]
+  # When the pro outlook is missing (mostly the Nov-Mar off-season), the model
+  # outlook covers these spots. Berkeley and Point Isabel: in winter storms
+  # they usually do better than TI.
+  model_outlook_spots: [Berkeley, Point Isabel]
   hours: [13, 14, 15, 16, 17, 18]
   # Spot ids are shared by the pro forecast and the live station feed.
   spots:
