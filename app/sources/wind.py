@@ -7,12 +7,12 @@ embeds a session token (`var token = '...'`) that the API accepts as
 
 import logging
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import httpx
 
-from ..config import CFG, TZ, env
-from . import outlook
+from ..config import CFG, TZ, env, is_evening
+from . import models, outlook
 
 log = logging.getLogger(__name__)
 
@@ -150,28 +150,52 @@ async def fetch() -> dict:
                 log.warning("pro forecast fetch failed, keeping previous: %s", e)
     fc = _forecast[1] if _forecast else {}
     daily = fc.get("daily") or {}
+    hours = cfg["hours"]
 
-    # The daily forecast covers one date. The evening update (~7 pm) is for
-    # tomorrow, so show today's or a later one, labelled; hide a stale or
-    # unpublished one and say why.
-    today = datetime.now(TZ).date()
+    # The pro daily forecast covers one date. The evening update (~7 pm) is for
+    # tomorrow, so show today's or a later one. Without a current one (not
+    # published, or off-season), fall back to the model spread for the day the
+    # board is on: today, or tomorrow after evening_switch.
+    now = datetime.now(TZ)
+    today = now.date()
     valid = _date_of(daily.get("valid_time_local"))
-    current = valid is not None and valid >= today
-    if not current:
-        forecast_day, note = "", _missing_reason(daily, today)
-    else:
-        forecast_day, note = ("Today" if valid == today else f"{valid:%a}"), ""
+    pro = valid is not None and valid >= today
+    reason = "" if pro else _missing_reason(daily, today)
+    grid_day = valid if pro else today + timedelta(days=1 if is_evening(now) else 0)
+
+    model_data = {}
+    ext_days = (fc.get("extended") or {}).get("days") or []
+    if not pro or not ext_days:
+        try:
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True,
+                                         headers={"User-Agent": "Mozilla/5.0 (eink dashboard)"}) as c:
+                model_data = await models.fetch(_api, c)
+        except Exception as e:
+            log.warning("model forecast fetch failed: %s", e)
+
     spots = [{
         "name": s["name"],
         "now": live.get(s["id"]),
-        "forecast": _spot_forecast(fc, s["id"], cfg["hours"]) if current else None,
+        "forecast": (_spot_forecast(fc, s["id"], hours) if pro
+                     else models.grid(model_data, s["id"], grid_day, hours) if model_data else None),
     } for s in cfg["spots"]]
+    has_grid = any(c for s in spots for c in (s["forecast"] or []))
 
+    if ext_days:
+        outlook_lines = await outlook.summarize(ext_days)
+        outlook_source = "iWindsurf pro" + (f" · issued {_issued_label(daily.get('issued_timestamp_local'))}"
+                                            if pro and daily.get("issued_timestamp_local") else "")
+    else:
+        outlook_lines = models.outlook(model_data, grid_day + timedelta(days=1), 3, hours) if model_data else []
+        outlook_source = "model range: " + ", ".join(models.OUTLOOK_MODELS.values()) if outlook_lines else ""
+
+    day_label = "Today" if grid_day == today else f"{grid_day:%a}"
     return {
         "spots": spots,
-        "outlook": await outlook.summarize((fc.get("extended") or {}).get("days") or []),
-        "forecast_day": forecast_day,
-        "note": note,
-        "issued": _issued_label(daily.get("issued_timestamp_local")) if current else "",
+        "outlook": outlook_lines,
+        "forecast_day": day_label if (pro or has_grid) else "",
+        "grid_source": "pro" if pro else ("model" if has_grid else ""),
+        "outlook_source": outlook_source,
+        "note": reason,
         "placeholder": False,
     }

@@ -3,7 +3,7 @@
 import re
 from datetime import datetime, timedelta
 
-from .config import CFG, TZ
+from .config import CFG, TZ, is_evening
 
 CONDITIONS = {
     "sunny": ("Sunny", "sun"),
@@ -66,38 +66,69 @@ def _num(states: dict, eid: str | None) -> float | None:
         return None
 
 
-def build_weather(ha: dict, now: datetime) -> dict:
-    w = ha["states"].get(CFG["weather_entity"], {})
-    label, icon = CONDITIONS.get(w.get("state"), ("—", "question-mark"))
-    temp = w.get("attributes", {}).get("temperature")
+def _hourly_at(ha: dict, day, hours: list[int]) -> list[tuple[str, int]]:
+    by_time = {_dt(p["datetime"]).replace(minute=0, second=0, microsecond=0): p for p in ha["hourly"]}
+    out = []
+    for h in hours:
+        p = by_time.get(datetime.combine(day, datetime.min.time(), tzinfo=TZ) + timedelta(hours=h))
+        if p:
+            out.append((fmt_hour(h), round(p["temperature"])))
+    return out
 
-    high = low = None
-    for p in ha["twice_daily"]:
-        start = _dt(p["datetime"])
-        if p.get("is_daytime") and start.date() == now.date() and high is None:
-            high = p["temperature"]
-        elif not p.get("is_daytime") and low is None and start.date() == now.date():
-            low = p["temperature"]
+
+def build_weather(ha: dict, now: datetime) -> dict:
+    """Today's weather, or after evening_switch, tomorrow's (headline = its high)."""
+    w = ha["states"].get(CFG["weather_entity"], {})
+    current = w.get("attributes", {}).get("temperature")
+    current = round(current) if current is not None else None
+    sun = ha["states"].get("sun.sun", {}).get("attributes", {})
+    periods = [(p, _dt(p["datetime"])) for p in ha["twice_daily"]]
+
+    def period(day, daytime):
+        return next((p for p, start in periods if start.date() == day and bool(p.get("is_daytime")) == daytime), None)
+
+    if is_evening(now):
+        tomorrow = now.date() + timedelta(days=1)
+        day, tonight = period(tomorrow, True), period(now.date(), False)
+        label, icon = CONDITIONS.get((day or {}).get("condition"), ("—", "question-mark"))
+        parts = []
+        if tonight:
+            parts.append(f"Low tonight {round(tonight['temperature'])}°")
+        if current is not None:
+            parts.append(f"now {current}°")
+        return {
+            "heading": f"Tomorrow · {tomorrow:%a %b} {tomorrow.day}",
+            "big": round(day["temperature"]) if day else "—",
+            "label": label,
+            "icon": icon,
+            "summary": " · ".join(parts),
+            "hourly": _hourly_at(ha, tomorrow, [9, 12, 15, 18]),
+            "note": f"Sunrise {fmt_time(_dt(sun['next_rising']))}" if sun.get("next_rising") else "",
+        }
+
+    label, icon = CONDITIONS.get(w.get("state"), ("—", "question-mark"))
+    day, tonight = period(now.date(), True), period(now.date(), False)
+    parts = []
+    if day:
+        parts.append(f"H {round(day['temperature'])}°")
+    if tonight:
+        parts.append(f"L {round(tonight['temperature'])}°")
 
     hourly = []
     for offset in (1, 3, 5, 7):
-        target = now + timedelta(hours=offset)
-        for p in ha["hourly"]:
-            if _dt(p["datetime"]) >= target.replace(minute=0, second=0, microsecond=0):
-                hourly.append((fmt_hour(_dt(p["datetime"]).hour), round(p["temperature"])))
-                break
-
-    sun = ha["states"].get("sun.sun", {}).get("attributes", {})
-    note = f"Sunset {fmt_time(_dt(sun['next_setting']))}" if sun.get("next_setting") else ""
+        target = (now + timedelta(hours=offset)).replace(minute=0, second=0, microsecond=0)
+        p = next((p for p in ha["hourly"] if _dt(p["datetime"]) >= target), None)
+        if p:
+            hourly.append((fmt_hour(_dt(p["datetime"]).hour), round(p["temperature"])))
 
     return {
-        "temp": round(temp) if temp is not None else "—",
+        "heading": f"{CFG['location_label']} · {now:%a %b} {now.day}",
+        "big": current if current is not None else "—",
         "label": label,
         "icon": icon,
-        "high": high,
-        "low": low,
+        "summary": " · ".join(parts),
         "hourly": hourly,
-        "note": note,
+        "note": f"Sunset {fmt_time(_dt(sun['next_setting']))}" if sun.get("next_setting") else "",
     }
 
 

@@ -37,16 +37,14 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
 <body class="b{{ bits }}">
 <div class="sc">
   <div style="border-right:2px solid #000;padding:14px 16px;display:flex;flex-direction:column">
-    <div class="lb">{{ location }} · {{ date_label }}</div>
+    <div class="lb">{{ weather.heading }}</div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
       <i class="ti ti-{{ weather.icon }}" style="font-size:48px"></i>
-      <span style="font-size:66px;font-weight:600;line-height:1">{{ weather.temp }}°</span>
+      <span style="font-size:66px;font-weight:600;line-height:1">{{ weather.big }}°</span>
     </div>
     <div style="font-size:17px;margin-top:4px">{{ weather.label }}</div>
     <div style="font-size:17px">
-      {%- if weather.high is not none %}H {{ weather.high }}°{% endif %}
-      {%- if weather.high is not none and weather.low is not none %} · {% endif %}
-      {%- if weather.low is not none %}L {{ weather.low }}°{% endif %}
+      {{ weather.summary }}
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);margin-top:10px;font-size:13px;text-align:center;border-top:2px solid #000;padding-top:6px">
       {% for h, t in weather.hourly %}<div>{{ h }}<br><b style="font-size:16px">{{ t }}</b></div>{% endfor %}
@@ -68,7 +66,7 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
     </div>
     {% if wind %}
     <table class="w">
-      <thead><tr><th style="width:100px;text-align:left;padding-left:6px">{{ wind.forecast_day }}</th><th style="width:70px">Now</th><th style="width:8px"></th>
+      <thead><tr><th style="width:100px;text-align:left;padding-left:6px;line-height:1.05">{{ wind.forecast_day }}{% if wind.grid_source == 'model' %}<br><span style="font-size:10px;font-weight:400">model range</span>{% endif %}</th><th style="width:70px">Now</th><th style="width:8px"></th>
         {% for h in wind_hours %}<th>{{ h }}</th>{% endfor %}</tr></thead>
       <tbody>
       {% for s in wind.spots %}
@@ -90,10 +88,10 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
       </tbody>
     </table>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px">
-      <span class="lb">Outlook</span><span style="font-size:12px">iWindsurf pro{% if wind.note %} · {{ wind.note }}{% elif wind.issued %} · issued {{ wind.issued }}{% endif %}</span>
+      <span class="lb">Outlook</span><span style="font-size:12px">{{ wind.outlook_source }}{% if wind.note %}{% if wind.outlook_source %} · {% endif %}pro {{ wind.note }}{% endif %}</span>
     </div>
     {% for o in wind.outlook %}<div class="ol" {% if loop.first %}style="margin-top:2px"{% endif %}><b>{{ o.day }}</b><span>{{ o.text }}</span></div>
-    {% else %}<div class="ol" style="margin-top:2px;grid-template-columns:1fr"><span>No pro outlook{% if wind.note %} ({{ wind.note }}){% endif %}. Live readings above are current.</span></div>{% endfor %}
+    {% else %}<div class="ol" style="margin-top:2px;grid-template-columns:1fr"><span>No outlook available. Live readings above are current.</span></div>{% endfor %}
     {% else %}
     <div style="margin-top:40px;font-size:16px">Wind data unavailable</div>
     {% endif %}

@@ -50,9 +50,15 @@ jewish_calendar:
   havdalah: sensor.jewish_calendar_upcoming_havdalah
   issur_melacha: binary_sensor.jewish_calendar_issur_melacha_in_effect
 
+# From this time until midnight the board shows tomorrow: the weather panel,
+# and the wind grid when it falls back to model forecasts.
+evening_switch: "18:00"
+
 wind:
   # iWindsurf "San Francisco" pro forecast.
   forecast_id: 2
+  # When the pro outlook is missing, the model outlook covers these spots.
+  model_outlook_spots: [Berkeley, TI]
   hours: [13, 14, 15, 16, 17, 18]
   # Spot ids are shared by the pro forecast and the live station feed.
   spots:
