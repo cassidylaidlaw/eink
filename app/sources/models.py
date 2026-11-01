@@ -14,10 +14,16 @@ from ..config import CFG, TZ
 
 log = logging.getLogger(__name__)
 
-# High-resolution models that resolve the Bay's sea breeze; ~1.5-3 days out.
-GRID_MODELS = {211: "WRF 1km", 170: "HRRR", 161: "NAM 3km", 280: "RRFS"}
-# Long-range models for the multi-day outlook.
-OUTLOOK_MODELS = {-1: "BLEND", 279: "ECMWF", 2: "GFS"}
+# 1-6 pm grid: iWindsurf's Bay-tuned 1 km WRF and NOAA's HRRR (~1.5 days).
+# WRF tracked the live afternoon breeze best when compared on 2026-11-01;
+# NAM/RRFS/HRRR brought it in hours late, so a 4-model spread was too wide.
+GRID_MODELS = {211: "WRF 1km", 170: "HRRR"}
+# Outlook: high-res models only (WRF, HRRR, NAM 3km, RRFS reach 1.5-3 days).
+# Global models (BLEND, ECMWF, GFS) can't resolve the sea breeze - they
+# forecast 2-4 kts Bay-wide on breezy days - so days beyond the high-res
+# models' reach are left out rather than filled with them.
+OUTLOOK_MODELS = {211: "WRF 1km", 170: "HRRR", 161: "NAM 3km", 280: "RRFS"}
+MIN_MODELS = 2  # a range needs at least two models
 REFRESH = 3600  # model runs land hourly at best
 
 _cache: tuple[float, dict] | None = None
@@ -48,8 +54,8 @@ async def fetch(api, client) -> dict:
         return _cache[1]
     spots = CFG["wind"]["spots"]
     outlook_spots = {s["id"] for s in spots if s["name"] in CFG["wind"].get("model_outlook_spots", [])}
-    jobs = [(s["id"], m) for s in spots for m in GRID_MODELS]
-    jobs += [(sid, m) for sid in outlook_spots for m in OUTLOOK_MODELS]
+    jobs = [(s["id"], m) for s in spots
+            for m in (GRID_MODELS.keys() | (OUTLOOK_MODELS.keys() if s["id"] in outlook_spots else set()))]
     sem = asyncio.Semaphore(4)
 
     async def one(sid, m):
@@ -68,7 +74,7 @@ def _spread(series_list, hours: list[datetime]):
     out = []
     for h in hours:
         vals = [s[h] for s in series_list if h in s]
-        if len(vals) < 2:
+        if len(vals) < MIN_MODELS:
             out.append(None)
             continue
         speeds = [v for v, _ in vals]
@@ -86,12 +92,13 @@ def grid(data: dict, spot_id: int, day: date, hours: list[int]):
 def outlook(data: dict, first_day: date, days: int, hours: list[int]) -> list[dict]:
     """One line per day: afternoon range at each outlook spot, e.g. 'Berkeley 8-12 WSW · TI 12-16 W'."""
     names = {s["id"]: s["name"] for s in CFG["wind"]["spots"]}
+    outlook_ids = {s["id"] for s in CFG["wind"]["spots"] if s["name"] in CFG["wind"].get("model_outlook_spots", [])}
     lines = []
     for i in range(days):
         day = first_day + timedelta(days=i)
         parts = []
         for sid, models in data.items():
-            if not any(m in models for m in OUTLOOK_MODELS):
+            if sid not in outlook_ids:
                 continue
             cells = _spread([models.get(m, {}) for m in OUTLOOK_MODELS],
                             [datetime.combine(day, datetime.min.time()) + timedelta(hours=h) for h in hours])
@@ -100,7 +107,7 @@ def outlook(data: dict, first_day: date, days: int, hours: list[int]) -> list[di
                 continue
             lo, hi = min(c[0] for c in cells), max(c[1] for c in cells)
             direction = Counter(c[2] for c in cells if c[2]).most_common(1)
-            parts.append(f"{names[sid]} {lo}–{hi}{' ' + direction[0][0] if direction else ''}")
+            parts.append(f"{names[sid]} {lo if lo == hi else f'{lo}–{hi}'}{' ' + direction[0][0] if direction else ''}")
         if parts:
             lines.append({"day": f"{day:%a}", "text": " · ".join(parts)})
     return lines

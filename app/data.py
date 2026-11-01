@@ -93,7 +93,7 @@ def build_weather(ha: dict, now: datetime) -> dict:
         label, icon = CONDITIONS.get((day or {}).get("condition"), ("—", "question-mark"))
         parts = []
         if tonight:
-            parts.append(f"Low tonight {round(tonight['temperature'])}°")
+            parts.append(f"Tonight {round(tonight['temperature'])}°")
         if current is not None:
             parts.append(f"now {current}°")
         return {

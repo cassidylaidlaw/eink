@@ -79,7 +79,7 @@ body { font-family: Inter, Helvetica, Arial, sans-serif; -webkit-font-smoothing:
           <td style="border:none"></td>
           {% for cell in (s.forecast or [none] * wind_hours|length) %}
             {% if cell %}{% set lo, hi, d = cell %}{% set cl = shade(hi) %}{% set p = 'pill' if cl in ('d1', 'd2') else '' %}
-            <td class="{{ cl }}"><span class="{{ p }}">{{ lo }}–{{ hi }}</span><br>
+            <td class="{{ cl }}"><span class="{{ p }}">{% if lo == hi %}{{ lo }}{% else %}{{ lo }}–{{ hi }}{% endif %}</span><br>
               <span class="{{ p }}" style="font-size:11px">{{ arrow(d) }}{{ d }}</span></td>
             {% else %}<td>–</td>{% endif %}
           {% endfor %}

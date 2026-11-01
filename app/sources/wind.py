@@ -197,7 +197,7 @@ async def fetch() -> dict:
                                             if pro and daily.get("issued_timestamp_local") else "")
     else:
         outlook_lines = models.outlook(model_data, grid_day + timedelta(days=1), 3, hours) if model_data else []
-        outlook_source = "model range: " + ", ".join(models.OUTLOOK_MODELS.values()) if outlook_lines else ""
+        outlook_source = "high-res models" if outlook_lines else ""
 
     day_label = "Today" if grid_day == today else f"{grid_day:%a}"
     return {
