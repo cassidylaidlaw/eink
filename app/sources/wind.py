@@ -5,6 +5,7 @@ embeds a session token (`var token = '...'`) that the API accepts as
 `wf_token`, so we sign in like a browser, read the token, then call the API.
 """
 
+import asyncio
 import logging
 import time
 from datetime import date, datetime, timedelta
@@ -24,6 +25,7 @@ FORECAST_EVERY = 1800
 LIVE_MAX_AGE = 45 * 60  # older station readings are shown as missing
 
 _token: str | None = None
+_login_lock = asyncio.Lock()
 _forecast: tuple[float, dict] | None = None
 
 
@@ -51,19 +53,27 @@ async def _login(c: httpx.AsyncClient) -> str:
 
 
 async def _api(c: httpx.AsyncClient, path: str, **params) -> dict:
-    """Call the API, signing in (again) if there is no token or it was rejected."""
+    """Call the API, signing in (again) if there is no token or it was rejected.
+
+    Calls run concurrently (model fetches), so sign-in is serialized: when a
+    token expires, one caller signs in and the rest reuse the new token.
+    Parallel sign-ins replace each other's sessions and all fail."""
     global _token
     for attempt in (1, 2):
-        if not _token:
-            _token = await _login(c)
-        r = await c.get(API + path, params={**UNITS, **params, "wf_token": _token})
+        async with _login_lock:
+            if not _token:
+                _token = await _login(c)
+            token = _token
+        r = await c.get(API + path, params={**UNITS, **params, "wf_token": token})
         body = r.json() if r.headers.get("content-type", "").startswith(("application/json", "text/")) else {}
         status = body.get("status", {}).get("status_code", r.status_code)
         if r.status_code == 200 and status == 0:
             return body
         log.warning("%s returned %s %s; re-authenticating", path, r.status_code,
                     body.get("status", {}).get("status_message"))
-        _token = None
+        async with _login_lock:
+            if _token == token:  # nobody has refreshed it yet
+                _token = None
     raise AuthError(f"{path} failed after re-login")
 
 
